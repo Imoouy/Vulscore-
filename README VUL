@@ -1,0 +1,79 @@
+# vulnscore
+
+Ranks vulnerabilities by risk instead of CVSS alone. Each (asset, CVE) pair is scored on severity, active exploitation, asset exposure, and asset criticality.
+
+## Data sources
+
+- **CISA KEV catalog**: known exploitation and ransomware use.
+- **NVD CVE API 2.0**: CVSS base score and attack vector.
+
+`assets.csv` is a sample inventory of seven assets.
+
+## Scoring
+
+```
+score = 100 × (CVSS/10) × threat × exposure × criticality / max_possible
+```
+
+| Factor | Values |
+|---|---|
+| Severity | CVSS / 10 |
+| Threat | 1.0 not in KEV, 2.0 in KEV, 2.5 in KEV with ransomware use |
+| Exposure | internet 1.0, tier0 0.9, internal 0.6, isolated 0.3 |
+| Criticality | 1–5, mapped to 0.2–1.0 |
+
+Factors are multiplied so that a low value in any one factor lowers the overall score.
+
+If the attack vector is LOCAL or PHYSICAL, exposure is capped at internal (0.6).
+
+## Results
+
+| # | Score | Asset | CVE | CVSS | KEV | Exposure | Crit |
+|---|---|---|---|---|---|---|---|
+| 1 | 94.0 | vpn01 | CVE-2023-4966 (Citrix Bleed) | 9.4 | Yes, ransomware | internet | 5 |
+| 2 | 90.0 | dc01 | CVE-2020-1472 (Zerologon) | 10.0 | Yes, ransomware | tier0 | 5 |
+| 3 | 80.0 | web01 | CVE-2021-44228 (Log4Shell) | 10.0 | Yes, ransomware | internet | 4 |
+| 4 | 78.4 | web01 | CVE-2021-41773 (Apache path traversal) | 9.8 | Yes, ransomware | internet | 4 |
+| 5 | 67.5 | dc01 | CVE-2021-42278 (sAMAccountName spoofing) | 7.5 | Yes, ransomware | tier0 | 5 |
+| 6 | 63.4 | dc01 | CVE-2022-26923 (Certifried) | 8.8 | Yes | tier0 | 5 |
+| 7 | 48.0 | web01 | CVE-2023-44487 (HTTP/2 Rapid Reset) | 7.5 | Yes | internet | 4 |
+| 8 | 27.0 | lt-fin-07 | CVE-2023-36884 | 7.5 | Yes, ransomware | internal | 3 |
+| 9 | 21.1 | print01 | CVE-2021-34527 (PrintNightmare) | 8.8 | Yes, ransomware | internal | 2 |
+| 10 | 18.0 | lt-gen-12 | CVE-2023-36884 | 7.5 | Yes, ransomware | internal | 2 |
+| 11 | 6.0 | dev-lab | CVE-2021-44228 (Log4Shell) | 10.0 | Yes, ransomware | isolated | 1 |
+| 12 | 2.4 | dev-lab | CVE-2023-38545 (curl SOCKS5) | 9.8 | No | isolated | 1 |
+
+Compared to sorting by CVSS:
+
+- Citrix Bleed moves from #6 to #1.
+- The two dev-lab CVEs drop from the top five to #11 and #12.
+- Log4Shell scores 80.0 on web01 and 6.0 on dev-lab.
+
+## Fixes
+
+**Tier0 exposure level.** Domain controllers were originally scored as internal (0.6), which understated their risk. Added `tier0` (0.9) for DCs, AD CS, SCCM, and similar assets that are reachable from most internal hosts.
+
+**Conflicting NVD scores.** Zerologon's NVD record has two Secondary CVSS entries: Microsoft's 5.5 (AV:L) and NIST's 10.0 (AV:N). The script used the first one listed, so the LOCAL cap kept Zerologon at internal exposure. It now uses the highest score and logs the source in `cvss_source` and the other scores in `other_scores`. Zerologon moved from #7 (33.0) to #2 (90.0). Four of ten CVEs had conflicting scores. Using the highest score can overstate risk (Citrix Bleed: 7.5 → 9.4).
+
+## Limitations
+
+- Weights are not calibrated against incident data.
+- CVEs with no NVD score default to 5.0 without a warning.
+- No EPSS data, so CVEs not yet in KEV are not prioritized by exploit likelihood.
+- Asset data is a sample CSV, not a scanner export or inventory.
+
+## Usage
+
+Requires Python 3.8+. No external dependencies.
+
+```bash
+# Optional NVD API key (50 requests/30s instead of 5)
+export NVD_API_KEY=your-key   # Linux/macOS
+set NVD_API_KEY=your-key      # Windows cmd
+
+python vulnscore.py assets.csv
+```
+
+Outputs a ranked table and `prioritized.csv`. KEV data is cached in `kev.json` and NVD responses in `nvd_cache/`.
+
+`assets.csv` columns: `asset,role,exposure,criticality,cves`. Separate CVEs with `;`. Exposure: `internet`, `tier0`, `internal`, `isolated`. Criticality: 1–5.

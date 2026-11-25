@@ -1,0 +1,8 @@
+asset,role,exposure,criticality,cves
+web01,Public web server (Apache + Java app),internet,4,CVE-2021-41773;CVE-2021-44228;CVE-2023-44487
+vpn01,Remote access gateway (Citrix NetScaler),internet,5,CVE-2023-4966
+dc01,Domain controller,tier0,5,CVE-2020-1472;CVE-2021-42278;CVE-2022-26923
+print01,Print server,internal,2,CVE-2021-34527
+lt-fin-07,Finance laptop,internal,3,CVE-2023-36884
+lt-gen-12,General staff laptop,internal,2,CVE-2023-36884
+dev-lab,Isolated dev box,isolated,1,CVE-2023-38545;CVE-2021-44228

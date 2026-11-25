@@ -1,0 +1,21 @@
+# Cached API data (rebuilt on next run)
+kev.json
+nvd_cache/
+
+# Generated output
+prioritized.csv
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/  
